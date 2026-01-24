@@ -1,0 +1,71 @@
+{
+  "title": "Unified Observability",
+  "uid": "unified-obs",
+  "schemaVersion": 36,
+  "version": 1,
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Caddy Request Rate",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "rate(caddy_http_requests_total[1m])", "legendFormat": "req/s" }
+      ],
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 6 }
+    },
+    {
+      "type": "graph",
+      "title": "Pi CPU Usage",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "100 - (avg by (instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)",
+          "legendFormat": "CPU %"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 6 }
+    },
+    {
+      "type": "graph",
+      "title": "Docker Container CPU",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "rate(container_cpu_usage_seconds_total[1m])",
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 6 }
+    },
+    {
+      "type": "graph",
+      "title": "Memory Usage",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+          "legendFormat": "RAM %"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 6 }
+    },
+    {
+      "type": "logs",
+      "title": "Caddy Logs",
+      "datasource": "Loki",
+      "targets": [
+        { "expr": "{job=\"caddy\"}" }
+      ],
+      "gridPos": { "x": 0, "y": 12, "w": 24, "h": 8 }
+    },
+    {
+      "type": "logs",
+      "title": "System Logs",
+      "datasource": "Loki",
+      "targets": [
+        { "expr": "{job=\"syslog\"}" }
+      ],
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 8 }
+    }
+  ]
+}

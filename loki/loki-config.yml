@@ -11,7 +11,7 @@ ingester:
         store: inmemory
       replication_factor: 1
   chunk_idle_period: 5m
-  chunk_retain_period: 30s
+  max_chunk_age: 1h
 
 schema_config:
   configs:
@@ -31,8 +31,8 @@ storage_config:
     directory: /loki/chunks
 
 limits_config:
-  ingestion_rate_mb: 10
-  ingestion_burst_size_mb: 20
+  ingestion_rate_mb: 4
+  ingestion_burst_size_mb: 6
 
 chunk_store_config:
   max_look_back_period: 0s
