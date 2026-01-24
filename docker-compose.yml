@@ -18,6 +18,8 @@ services:
     container_name: loki
     volumes:
       - ./loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki 
+      - loki_wal:/wal
     command: -config.file=/etc/loki/local-config.yaml
     ports:
       - "3100:3100"
@@ -50,3 +52,5 @@ services:
 volumes:
   prometheus_data:
   grafana_data:
+  loki_data:
+  loki_wal:
