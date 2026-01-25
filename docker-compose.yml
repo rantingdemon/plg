@@ -40,7 +40,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./grafana/var/lib/grafana
+      - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
 
@@ -48,4 +48,7 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     restart: unless-stopped
+  volumes:
+    prometheus_data:
+    grafana_data:
 
