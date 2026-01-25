@@ -52,5 +52,5 @@ services:
 volumes:
   prometheus_data:
   grafana_data:
-  loki_data:
-  loki_wal:
+  loki_data: ./loki
+  loki_wal: ./wal
