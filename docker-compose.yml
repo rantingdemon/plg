@@ -18,8 +18,8 @@ services:
     container_name: loki
     volumes:
       - ./loki/loki-config.yml:/etc/loki/local-config.yaml
-      - loki_data:/loki 
-      - loki_wal:/wal
+      - ./loki:/loki 
+      - ./wal:/wal
     command: -config.file=/etc/loki/local-config.yaml
     ports:
       - "3100:3100"
@@ -49,18 +49,3 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     restart: unless-stopped
 
-volumes:
-  prometheus_data:
-  grafana_data:
-  loki_data:
-    driver: local
-    driver_opts:
-      type: "none"
-      o: "bind"
-      device: "./loki"
-  loki_wal:
-    driver: local
-    driver_opts:
-      type: "none"
-      o: "bind"
-      device: "./wal"
