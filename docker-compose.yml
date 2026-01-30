@@ -1,54 +1,138 @@
-version: "3.9"
+version: '3.8'
 
 services:
+  # Prometheus - Metrics collection and storage
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
+      - prometheus-data:/prometheus
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
     ports:
       - "9090:9090"
     restart: unless-stopped
+    networks:
+      - monitoring
 
+  # Node Exporter - Hardware and OS metrics for Raspberry Pi
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    command:
+      - '--path.rootfs=/host'
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /:/host:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # cAdvisor - Docker container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  # Loki - Log aggregation
   loki:
-    image: grafana/loki:2.9.0
+    image: grafana/loki:latest
     container_name: loki
     volumes:
-      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
-      - ./loki:/loki 
-      - ./wal:/wal
-    command: -config.file=/etc/loki/local-config.yaml
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml
+      - loki-data:/loki
+    command: -config.file=/etc/loki/loki-config.yml
     ports:
       - "3100:3100"
     restart: unless-stopped
+    networks:
+      - monitoring
 
+  # Promtail - Log collector for Caddy
   promtail:
-    image: grafana/promtail:2.9.0
+    image: grafana/promtail:latest
+    container_name: promtail
     volumes:
-      - ./promtail/promtail-config.yml:/etc/promtail/config.yml
-      - /var/log/caddy:/var/log/caddy
-    command: -config.file=/etc/promtail/config.yml
+      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/promtail-config.yml
     restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - loki
 
+  # Syslog-ng - Receive MikroTik syslog and forward to Loki
+  syslog-ng:
+    image: balabit/syslog-ng:latest
+    container_name: syslog-ng
+    volumes:
+      - ./syslog-ng/syslog-ng.conf:/etc/syslog-ng/syslog-ng.conf
+      - syslog-data:/var/log/syslog-ng
+    ports:
+      - "514:514/udp"
+      - "514:514/tcp"
+      - "601:601"
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - loki
 
+  # Grafana - Visualization and dashboards
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
-    ports:
-      - "3000:3000"
     volumes:
-      - grafana_data:/var/lib/grafana
+      - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
-
-
     environment:
+      - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=
+    ports:
+      - "3000:3000"
     restart: unless-stopped
-volumes:
-  prometheus_data:
-  grafana_data:
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+      - loki
 
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  loki-data:
+  grafana-data:
+  syslog-data:
