@@ -1,12 +1,14 @@
 version: '3.8'
 
 services:
-  # Prometheus - Metrics collection and storage
+  # Prometheus - Metrics collection
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    restart: unless-stopped
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/rules:/etc/prometheus/rules
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -16,26 +18,24 @@ services:
       - '--web.console.templates=/usr/share/prometheus/consoles'
     ports:
       - "9090:9090"
-    restart: unless-stopped
     networks:
       - monitoring
 
-  # Node Exporter - Hardware and OS metrics for Raspberry Pi
+  # Node Exporter - Host metrics
   node-exporter:
     image: prom/node-exporter:latest
     container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
     command:
-      - '--path.rootfs=/host'
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-    volumes:
-      - /:/host:ro,rslave
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
     ports:
       - "9100:9100"
-    restart: unless-stopped
     networks:
       - monitoring
 
@@ -43,9 +43,8 @@ services:
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: cadvisor
+    restart: unless-stopped
     privileged: true
-    devices:
-      - /dev/kmsg
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -54,43 +53,45 @@ services:
       - /dev/disk/:/dev/disk:ro
     ports:
       - "8080:8080"
-    restart: unless-stopped
     networks:
       - monitoring
+    devices:
+      - /dev/kmsg
 
   # Loki - Log aggregation
   loki:
     image: grafana/loki:latest
     container_name: loki
+    restart: unless-stopped
     volumes:
-      - ./loki/loki-config.yml:/etc/loki/loki-config.yml
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
       - loki-data:/loki
-    command: -config.file=/etc/loki/loki-config.yml
     ports:
       - "3100:3100"
-    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
     networks:
       - monitoring
 
-  # Promtail - Log collector for Caddy
+  # Promtail - Log shipper for Caddy
   promtail:
     image: grafana/promtail:latest
     container_name: promtail
+    restart: unless-stopped
     volumes:
-      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml
       - /var/log:/var/log:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
-    command: -config.file=/etc/promtail/promtail-config.yml
-    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
     networks:
       - monitoring
     depends_on:
       - loki
 
-  # Syslog-ng - Receive MikroTik syslog and forward to Loki
+  # Syslog-ng - Receives syslog from MikroTik and forwards to Loki
   syslog-ng:
     image: balabit/syslog-ng:latest
     container_name: syslog-ng
+    restart: unless-stopped
     volumes:
       - ./syslog-ng/syslog-ng.conf:/etc/syslog-ng/syslog-ng.conf
       - syslog-data:/var/log/syslog-ng
@@ -98,29 +99,28 @@ services:
       - "514:514/udp"
       - "514:514/tcp"
       - "601:601"
-    restart: unless-stopped
     networks:
       - monitoring
     depends_on:
       - loki
 
-  # Grafana - Visualization and dashboards
+  # Grafana - Visualization
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
+    restart: unless-stopped
     volumes:
-      - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_ROOT_URL=http://localhost:3000
-      - GF_INSTALL_PLUGINS=
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource,grafana-piechart-panel
     ports:
       - "3000:3000"
-    restart: unless-stopped
     networks:
       - monitoring
     depends_on:
